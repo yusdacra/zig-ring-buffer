@@ -35,7 +35,7 @@ pub fn RingBuffer(comptime T: type) type {
         empty: bool = true,
 
         pub fn init(this: *This, size: usize, allocator: std.mem.Allocator) anyerror!void {
-            if (@clz(usize, size) + @ctz(usize, size) != @bitSizeOf(usize) - 1) {
+            if (@clz(size) + @ctz(size) != @bitSizeOf(usize) - 1) {
                 // Hack to make sure the given size is a power of 2
                 debug.print("Input size is not a power of 2.", .{});
                 return RingBufferError.SIZE_NOT_POWER_OF_2;
@@ -63,11 +63,11 @@ pub fn RingBuffer(comptime T: type) type {
                 return RingBufferError.RING_DEAD;
             }
             if (@atomicLoad(bool, &this.data[this.next_producer].produced, ordering.Acquire)) {
-                return RingBufferError.BUFFER_FULL;
+                return RingBufferError.RING_FULL;
             }
 
             this.data[this.next_producer].data = elt;
-            @atomicStore(bool, this.data[this.next_producer].produced, true, ordering.Release);
+            @atomicStore(bool, &this.data[this.next_producer].produced, true, ordering.Release);
             this.next_producer = (this.next_producer + 1) % this.size;
         }
 
@@ -79,7 +79,7 @@ pub fn RingBuffer(comptime T: type) type {
                 return null;
             } else {
                 var elt = @ptrCast(*volatile T, &this.data[this.next_consumer]).*;
-                @atomicStore(bool, this.data[this.next_consumer].produced, false, ordering.Release);
+                @atomicStore(bool, &this.data[this.next_consumer].produced, false, ordering.Release);
                 this.next_consumer = (this.next_consumer + 1) % this.size;
                 return elt;
             }
